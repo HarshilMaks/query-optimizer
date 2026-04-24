@@ -1,6 +1,6 @@
 # AI-Powered Postgres Query Optimizer
 
-QuerySage connects to your PostgreSQL databases, automatically identifies the slowest queries using `pg_stat_statements`, runs `EXPLAIN ANALYZE` on each one, and uses Gemini AI to analyze the execution plan and generate specific index recommendations and query rewrites.
+It connects to your PostgreSQL databases, automatically identifies the slowest queries using `pg_stat_statements`, runs `EXPLAIN ANALYZE` on each one, and uses Gemini AI to analyze the execution plan and generate specific index recommendations and query rewrites.
 
 ## Features
 
