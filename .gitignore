@@ -1,0 +1,164 @@
+# ==============================================================================
+# DEPENDENCIES & PACKAGE MANAGERS
+# ==============================================================================
+# Node.js - npm/yarn/pnpm installed packages
+node_modules/
+npm-debug.log
+npm-error.log
+yarn-error.log
+pnpm-error.log
+pnpm-debug.log*
+
+# ==============================================================================
+# BUILD OUTPUT & GENERATED FILES
+# ==============================================================================
+# Vite build outputs (client-side and server-side)
+dist/
+dist-ssr/
+coverage/
+
+# TanStack Router auto-generated route tree
+src/routeTree.gen.ts
+src/routeTree.gen.d.ts
+
+# Netlify functions build artifacts
+.netlify/v1/functions/*.mjs
+.netlify/v1/functions/*.js
+
+# ==============================================================================
+# ENVIRONMENT & SECRETS
+# ==============================================================================
+# Environment files (local overrides, secrets)
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# Never commit encrypted credentials or API keys
+# ENCRYPTION_KEY, GEMINI_API_KEY (Netlify injected), RESEND_API_KEY
+.env.*.private
+
+# ==============================================================================
+# RUNTIME & CACHE
+# ==============================================================================
+# TanStack build cache
+.tanstack/
+.tanstack/**/*
+
+# IDE/Editor temporary files and workspace settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ==============================================================================
+# LOCAL DEVELOPMENT
+# ==============================================================================
+# Netlify CLI local state
+.netlify/cache/
+.netlify/blobs/
+netlify-functions-local/
+
+# Vite dev server cache
+.vite/
+
+# Local test/debug artifacts
+*.test.local.ts
+debug.log
+
+# ==============================================================================
+# IDE-SPECIFIC (if using specific editors, uncomment as needed)
+# ==============================================================================
+# VS Code
+# .vscode/settings.json
+# .vscode/extensions.json
+
+# WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ==============================================================================
+# OS-SPECIFIC
+# ==============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+Thumbs.db
+ehthumbs.db
+
+# ==============================================================================
+# LINTING & FORMATTING (generated files, not source)
+# ==============================================================================
+# ESLint cache
+.eslintcache
+
+# Prettier
+.prettierignore
+
+# ==============================================================================
+# DOCUMENTATION & NOTES (local developer notes only)
+# ==============================================================================
+# Local development notes (version-controlled docs go in /docs)
+TODO_LOCAL.md
+NOTES_LOCAL.md
+DEV_NOTES.md
+
+# ==============================================================================
+# SENSITIVE DATA (NEVER COMMIT)
+# ==============================================================================
+# Database backups or exports
+*.sql
+*.dump
+*.bak
+
+# API response captures (may contain sensitive data)
+*.response.json
+*.capture.json
+
+# Local credentials or tokens (if accidentally created)
+credentials.json
+tokens.json
+secrets.json
+
+# ==============================================================================
+# LARGE/TEMPORARY FILES
+# ==============================================================================
+# Dependency lock files (optional: keep package-lock.json for reproducibility)
+# pnpm-lock.yaml  (uncomment if using pnpm and want to ignore)
+
+# Temporary files
+*.tmp
+*.temp
+*.backup
+
+# ==============================================================================
+# PROJECT-SPECIFIC EXCLUSIONS
+# ==============================================================================
+# Netlify site metadata (local CLI state)
+.netlify/state.json
+
+# Keep committed files:
+# - package.json (includes scripts, metadata)
+# - package-lock.json (reproducible builds)
+# - netlify.toml (deployment config)
+# - tsconfig.json (TypeScript config)
+# - vite.config.ts (Vite config)
+# - src/ (all source code)
+# - public/ (public assets)
+# - netlify/functions/ (serverless functions)
+# - docs/ (project documentation)
+# - README.md (project overview)
+# - AGENTS.md (team/collaboration notes)
+# - CLAUDE.local.md (AI context)
+# - plan.md (implementation plan)

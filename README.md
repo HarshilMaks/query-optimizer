@@ -1,77 +1,103 @@
-# QuerySage an AI-Powered Postgres Query Optimizer
+# QuerySage
 
-It connects to your PostgreSQL databases, automatically identifies the slowest queries using `pg_stat_statements`, runs `EXPLAIN ANALYZE` on each one, and uses Gemini AI to analyze the execution plan and generate specific index recommendations and query rewrites.
+> **AI-Powered PostgreSQL Query Optimizer**
 
-## Features
+## Overview
+QuerySage is an intelligent database performance diagnostic tool designed to eliminate the guesswork from PostgreSQL optimization. By connecting directly to your database, QuerySage leverages `pg_stat_statements` to automatically identify your slowest, most resource-intensive queries. It executes `EXPLAIN ANALYZE` on these bottlenecks and passes the execution plans through Google Gemini AI to generate plain-English performance insights, actionable query rewrites, and precise indexing recommendations.
 
-- **Slow Query Detection** — Pulls the worst queries from `pg_stat_statements` ranked by mean execution time
-- **EXPLAIN ANALYZE** — Runs query execution plan analysis and visualizes it as an interactive tree diagram
-- **Gemini AI Analysis** — Sends the execution plan to Gemini AI for plain-English bottleneck analysis and index recommendations
-- **Index Recommendations** — Generates exact `CREATE INDEX CONCURRENTLY` SQL with estimated improvement percentages
-- **Query Rewrite Suggestions** — Identifies queries that can be rewritten for better performance
-- **Suggestions History** — Tracks all recommendations with apply/dismiss workflow and CSV export
-- **Weekly Digest** — Sends automated email summaries via Resend API
-- **AES-256 Encryption** — All database passwords are encrypted at rest before storage
+Crucially, QuerySage acts purely as an advisory tool. It **never** executes SQL mutations or DDL commands against your database. It generates `CREATE INDEX CONCURRENTLY` statements and rewritten queries for you to review and apply safely.
 
-## Tech Stack
+## Architecture & Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | TanStack Start + TanStack Router |
-| Frontend | React 19, Tailwind CSS 4 |
-| AI | Google Gemini (via Netlify AI Gateway) |
-| Storage | Netlify Blobs (key-value persistence) |
-| Database Client | `pg` (Node.js PostgreSQL driver) |
-| Charts | Recharts |
-| Execution Plan Tree | React Flow (@xyflow/react) |
-| Email | Resend API |
-| Deployment | Netlify |
+QuerySage is built as a full-stack application using modern React and Edge computing patterns, optimized for deployment on Netlify.
 
-## Pages
+- **Framework & Routing:** [TanStack Start](https://tanstack.com/start/latest) combined with TanStack Router for type-safe, file-based routing.
+- **Frontend:** React 19, styled with Tailwind CSS 4.
+- **Visualizations:** [React Flow](https://reactflow.dev/) for interactive execution plan tree diagrams and Recharts for performance metrics.
+- **AI Integration:** Google Gemini via `@google/genai`.
+- **Database Connectivity:** Node.js `pg` driver for secure, read-only metric gathering.
+- **Persistence:** Netlify Blobs for low-latency, key-value storage of encrypted connections and suggestion history.
+- **Communications:** Resend API for automated weekly performance digests.
 
-| Route | Description |
-|-------|-------------|
-| `/` | Landing page with features and demo |
-| `/connect` | Add and manage database connections |
-| `/dashboard` | Main dashboard with slow queries table |
-| `/query/:id` | Query detail, EXPLAIN ANALYZE, AI analysis |
-| `/suggestions` | All AI recommendations across databases |
-| `/digest` | Weekly email digest preview and configuration |
-| `/settings` | Connection management, notifications, account |
+## Key Features
 
-## Running Locally
+- **Automated Slow Query Detection:** Pulls the worst-performing queries directly from `pg_stat_statements`, ranked by mean execution time and call frequency.
+- **Visual Execution Plans:** Translates raw `EXPLAIN ANALYZE` JSON output into an interactive, visual tree diagram to easily spot sequential scans and high-cost nodes.
+- **AI Bottleneck Analysis:** Sends execution plans to Gemini AI to receive concise, human-readable explanations of performance issues.
+- **Smart Index Recommendations:** Generates exact `CREATE INDEX CONCURRENTLY` SQL commands, complete with estimated performance improvements.
+- **Query Rewrite Suggestions:** Identifies queries that can be restructured for better PostgreSQL query planner execution.
+- **Suggestion History & Workflows:** Track, apply, or dismiss recommendations over time, with full CSV export capabilities.
+- **Weekly Digests:** Automated email summaries of your database's health and new optimization opportunities.
+- **Secure by Design:** All database passwords are encrypted at rest using AES-256-GCM. Raw credentials are never sent to the AI; only table metadata and query plans are transmitted.
 
-```bash
-# Install dependencies
-npm install
+## Getting Started
 
-# Start development server (uses Netlify CLI for Blobs emulation)
-netlify dev
-```
+### Prerequisites
+1. **Node.js** (v18+ recommended)
+2. **Netlify CLI** (required for local development to emulate Netlify Blobs)
+3. A PostgreSQL database with `pg_stat_statements` enabled.
 
-The app runs at `http://localhost:8888`.
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ENCRYPTION_KEY` | Recommended | 32-char key for AES-256 password encryption. Defaults to a placeholder in dev. |
-| `RESEND_API_KEY` | For email | API key for Resend email service |
-| `GEMINI_API_KEY` | Auto (Netlify) | Injected automatically by Netlify AI Gateway |
-
-## Security Notes
-
-- Database passwords are encrypted with AES-256-GCM before storing in Netlify Blobs
-- QuerySage **never executes SQL on your database** — all suggestions are copy-and-run
-- Only the EXPLAIN ANALYZE plan JSON and table metadata are sent to Gemini AI, never raw credentials
-- AI analysis is rate-limited to 20 requests per hour
-
-## Enabling pg_stat_statements
-
-QuerySage requires `pg_stat_statements` to detect slow queries. Run on your PostgreSQL server:
-
+To enable `pg_stat_statements` on your Postgres server, execute the following as a superuser:
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';
 SELECT pg_reload_conf();
 ```
+
+### Installation
+
+Clone the repository and install dependencies:
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the root of your project. The following variables are utilized:
+
+| Variable | Requirement | Description |
+|----------|-------------|-------------|
+| `ENCRYPTION_KEY` | Recommended | A 32-character string used for AES-256 password encryption. If omitted during development, a placeholder is used. |
+| `RESEND_API_KEY` | Optional | Required only if you wish to test or enable the weekly email digest feature. |
+| `GEMINI_API_KEY` | Required | Your Google Gemini API key. When deployed to Netlify, this can be managed via the Netlify AI Gateway. |
+
+### Development Server
+
+Start the development server using the Netlify CLI to ensure Edge functions and Blobs are properly emulated:
+
+```bash
+netlify dev
+```
+*The application will typically be available at `http://localhost:8888`.*
+
+## Project Structure
+
+```text
+├── src/
+│   ├── components/  # Reusable UI elements and charts
+│   ├── routes/      # TanStack file-based routing definitions
+│   │   ├── index.tsx         # Landing page
+│   │   ├── connect.tsx       # Database connection management
+│   │   ├── dashboard.tsx     # Main dashboard (Slow queries)
+│   │   ├── query.$id.tsx     # Query detail & AI Analysis view
+│   │   ├── suggestions.tsx   # Aggregated AI recommendations
+│   │   └── settings.tsx      # Application configuration
+│   ├── router.tsx   # Router configuration
+│   └── styles.css   # Global Tailwind configuration
+├── netlify.toml     # Netlify deployment configuration
+└── vite.config.ts   # Vite & TanStack Start build settings
+```
+
+## Deployment
+
+QuerySage is pre-configured for seamless deployment to Netlify. 
+
+1. Connect your GitHub repository to your Netlify account.
+2. Set your `ENCRYPTION_KEY`, `RESEND_API_KEY`, and `GEMINI_API_KEY` in the Netlify UI under **Site configuration > Environment variables**.
+3. Netlify will automatically detect the build settings via `netlify.toml` (Build command: `vite build`, Publish directory: `dist/client`).
+
+## Security Considerations
+
+- **Read-Only Operation:** QuerySage only requires permission to read `pg_stat_statements` and execute `EXPLAIN`. It is highly recommended to provide QuerySage with a database user that possesses **only** read permissions.
+- **Data Privacy:** Only query structure, table schemas, and execution plans are sent to the AI. Ensure your queries do not contain sensitive PII hardcoded as literals.
