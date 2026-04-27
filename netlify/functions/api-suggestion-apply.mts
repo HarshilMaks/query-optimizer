@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, suggestionKey, queryKey } from './lib/storage.js'
+import { appendAuditEvent } from './lib/audit.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -19,6 +20,14 @@ export default async (req: Request, ctx: Context) => {
     const query = await getItem<any>(queryKey(suggestion.query_id))
     if (query) await setItem(queryKey(suggestion.query_id), { ...query, status: 'optimized' })
   }
+
+  await appendAuditEvent({
+    entity_type: 'suggestion',
+    entity_id: id,
+    action: 'suggestion.applied',
+    reason: 'Marked as applied',
+    metadata: { query_id: suggestion.query_id, suggestion_type: suggestion.suggestion_type },
+  })
 
   return json({ success: true, suggestion: updated, modal: { title: 'Apply Index Manually', message: 'Copy this SQL and run it on your database or read replica. QuerySage does not execute SQL on your behalf for safety.', sql: suggestion.sql_to_run } })
 }

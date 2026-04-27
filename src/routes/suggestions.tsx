@@ -90,6 +90,7 @@ function SuggestionsPage() {
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-left">Database</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-left">Type</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-left">Title</th>
+                <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Risk</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Est. Gain</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Status</th>
                 <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">Actions</th>
@@ -97,9 +98,9 @@ function SuggestionsPage() {
             </thead>
             <tbody>
               {loading ? Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-slate-800/50"><td colSpan={7} className="px-4 py-3"><Skeleton className="h-4" /></td></tr>
+                <tr key={i} className="border-b border-slate-800/50"><td colSpan={8} className="px-4 py-3"><Skeleton className="h-4" /></td></tr>
               )) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-16 text-center">
+                <tr><td colSpan={8} className="px-4 py-16 text-center">
                   <CheckCircle2 size={32} className="text-slate-600 mx-auto mb-3" />
                   <p className="text-slate-400">No suggestions found. Analyze some slow queries to generate recommendations.</p>
                 </td></tr>
@@ -114,6 +115,11 @@ function SuggestionsPage() {
                   <td className="px-4 py-3"><Badge variant={s.suggestion_type}>{s.suggestion_type}</Badge></td>
                   <td className="px-4 py-3 text-sm text-slate-300 max-w-xs truncate">{s.title}</td>
                   <td className="px-4 py-3 text-right">
+                    <span className={`text-xs font-semibold ${Number(s.risk_score ?? 0) >= 80 ? 'text-red-400' : Number(s.risk_score ?? 0) >= 60 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {s.risk_score ?? '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     {s.estimated_improvement_pct ? (
                       <span className="text-emerald-400 font-semibold text-sm">+{s.estimated_improvement_pct}%</span>
                     ) : '—'}
@@ -122,9 +128,15 @@ function SuggestionsPage() {
                   <td className="px-4 py-3 text-right">
                     {s.status === 'pending' && (
                       <div className="flex items-center gap-2 justify-end">
+                        {s.policy_decision === 'blocked' ? (
+                          <span className="text-xs text-red-400">Blocked by policy</span>
+                        ) : s.policy_decision === 'approval_required' && s.approval_status !== 'approved' ? (
+                          <span className="text-xs text-amber-400">Approval required</span>
+                        ) : (
                         <button onClick={() => handleApply(s.id)} disabled={applying === s.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs rounded-lg transition-colors disabled:opacity-50">
                           {applying === s.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />} Apply
                         </button>
+                        )}
                         <button onClick={() => handleDismiss(s.id)} disabled={dismissing === s.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors disabled:opacity-50">
                           {dismissing === s.id ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />} Dismiss
                         </button>

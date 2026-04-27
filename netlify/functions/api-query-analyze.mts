@@ -1,6 +1,8 @@
 import type { Context } from '@netlify/functions'
-import { getItem, setItem, listByPrefix, queryKey, explainKey, analysisKey, suggestionKey } from './lib/storage.js'
+import { getItem, setItem, listByPrefix, queryKey, explainKey, analysisKey, suggestionKey, approvalKey } from './lib/storage.js'
 import { analyzeExecutionPlan, checkRateLimit } from './lib/gemini.js'
+import { assessSuggestion, getActivePolicy } from './lib/guardrails.js'
+import { appendAuditEvent } from './lib/audit.js'
 import type { SlowQuery } from './api-queries.mjs'
 
 function json(data: unknown, status = 200) {
@@ -16,6 +18,7 @@ export default async (req: Request, ctx: Context) => {
 
   const query = await getItem<SlowQuery>(queryKey(id))
   if (!query) return json({ error: 'Query not found' }, 404)
+  const tenantId = 'default'
 
   // Get most recent explain result
   const explains = (await listByPrefix('explain/')).filter((e: any) => e.query_id === id)
@@ -39,24 +42,79 @@ export default async (req: Request, ctx: Context) => {
       summary: result.summary, bottlenecks_json: result.bottlenecks,
       model_used: 'gemini-2.0-flash', tokens_used: result.tokens_used,
       cost_usd: 0, created_at: new Date().toISOString(),
+      tenant_id: tenantId,
     }
     await setItem(analysisKey(analysisId), analysis)
+    await appendAuditEvent({
+      tenant_id: tenantId,
+      entity_type: 'analysis',
+      entity_id: analysisId,
+      action: 'analysis.created',
+      reason: 'AI analysis completed',
+      metadata: { query_id: id, model_used: analysis.model_used },
+    })
 
     // Save suggestions
+    const activePolicy = await getActivePolicy(tenantId)
     const suggestions = []
     for (const rec of (result.index_recommendations ?? [])) {
       const sid = crypto.randomUUID()
+      const assessed = assessSuggestion(
+        { suggestion_type: 'index', estimated_improvement_pct: rec.estimated_improvement_pct, sql_to_run: rec.sql },
+        activePolicy,
+      )
       const suggestion = {
         id: sid, analysis_id: analysisId, query_id: id,
         suggestion_type: 'index', title: rec.title, description: rec.explanation,
         sql_to_run: rec.sql, estimated_improvement_pct: rec.estimated_improvement_pct,
         status: 'pending', applied_at: null, created_at: new Date().toISOString(),
+        tenant_id: tenantId,
+        risk_score: assessed.risk_score,
+        confidence_score: assessed.confidence_score,
+        policy_decision: assessed.policy_decision,
+        policy_reason: assessed.decision_reason,
       }
       await setItem(suggestionKey(sid), suggestion)
       suggestions.push(suggestion)
+      await appendAuditEvent({
+        tenant_id: tenantId,
+        entity_type: 'suggestion',
+        entity_id: sid,
+        action: 'suggestion.created',
+        reason: assessed.decision_reason,
+        metadata: { policy_decision: assessed.policy_decision, risk_score: assessed.risk_score },
+      })
+
+      if (assessed.policy_decision === 'approval_required') {
+        const approvalId = crypto.randomUUID()
+        await setItem(approvalKey(approvalId), {
+          id: approvalId,
+          tenant_id: tenantId,
+          recommendation_id: sid,
+          query_id: id,
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+          requested_by: 'system',
+          reason: assessed.decision_reason,
+          risk_score: assessed.risk_score,
+          confidence_score: assessed.confidence_score,
+        })
+        await appendAuditEvent({
+          tenant_id: tenantId,
+          entity_type: 'approval',
+          entity_id: approvalId,
+          action: 'approval.requested',
+          reason: assessed.decision_reason,
+          metadata: { recommendation_id: sid, risk_score: assessed.risk_score },
+        })
+      }
     }
     if (result.query_rewrite) {
       const sid = crypto.randomUUID()
+      const assessed = assessSuggestion(
+        { suggestion_type: 'rewrite', estimated_improvement_pct: 40, sql_to_run: result.query_rewrite.rewritten },
+        activePolicy,
+      )
       const suggestion = {
         id: sid, analysis_id: analysisId, query_id: id,
         suggestion_type: 'rewrite', title: 'Query Rewrite',
@@ -66,13 +124,58 @@ export default async (req: Request, ctx: Context) => {
         created_at: new Date().toISOString(),
         original_query: result.query_rewrite.original,
         rewritten_query: result.query_rewrite.rewritten,
+        tenant_id: tenantId,
+        risk_score: assessed.risk_score,
+        confidence_score: assessed.confidence_score,
+        policy_decision: assessed.policy_decision,
+        policy_reason: assessed.decision_reason,
       }
       await setItem(suggestionKey(sid), suggestion)
       suggestions.push(suggestion)
+      await appendAuditEvent({
+        tenant_id: tenantId,
+        entity_type: 'suggestion',
+        entity_id: sid,
+        action: 'suggestion.created',
+        reason: assessed.decision_reason,
+        metadata: { policy_decision: assessed.policy_decision, risk_score: assessed.risk_score },
+      })
+
+      if (assessed.policy_decision === 'approval_required') {
+        const approvalId = crypto.randomUUID()
+        await setItem(approvalKey(approvalId), {
+          id: approvalId,
+          tenant_id: tenantId,
+          recommendation_id: sid,
+          query_id: id,
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+          requested_by: 'system',
+          reason: assessed.decision_reason,
+          risk_score: assessed.risk_score,
+          confidence_score: assessed.confidence_score,
+        })
+        await appendAuditEvent({
+          tenant_id: tenantId,
+          entity_type: 'approval',
+          entity_id: approvalId,
+          action: 'approval.requested',
+          reason: assessed.decision_reason,
+          metadata: { recommendation_id: sid, risk_score: assessed.risk_score },
+        })
+      }
     }
 
     // Update query status
     await setItem(queryKey(id), { ...query, status: 'analyzed' })
+    await appendAuditEvent({
+      tenant_id: tenantId,
+      entity_type: 'query',
+      entity_id: id,
+      action: 'query.analyzed',
+      reason: 'Query analyzed and recommendations generated',
+      metadata: { analysis_id: analysisId, suggestion_count: suggestions.length },
+    })
 
     return json({ analysis, suggestions, bottlenecks: result.bottlenecks, rateLimit: rateCheck })
   } catch (err) {

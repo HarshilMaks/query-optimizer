@@ -36,7 +36,7 @@ export const api = {
       const q = new URLSearchParams(params as any).toString()
       return request<any[]>(`/api/suggestions${q ? `?${q}` : ''}`)
     },
-    update: (id: string, data: any) => request<any>(`/api/suggestions?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request<any>(`/api/suggestions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     apply: (id: string) => request<any>(`/api/suggestions/${id}/apply`, { method: 'POST', body: JSON.stringify({}) }),
     exportUrl: () => '/api/suggestions/export',
   },
@@ -44,5 +44,19 @@ export const api = {
     get: () => request<any>('/api/digest'),
     updateSettings: (data: any) => request<any>('/api/digest/settings', { method: 'PUT', body: JSON.stringify(data) }),
     send: (email: string) => request<any>('/api/digest/send', { method: 'POST', body: JSON.stringify({ recipient_email: email }) }),
+  },
+  policies: {
+    list: () => request<any[]>('/api/policies'),
+    create: (data: any) => request<any>('/api/policies', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request<any>(`/api/policies/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  approvals: {
+    list: (status?: string) => request<any[]>(`/api/approvals${status ? `?status=${status}` : ''}`),
+    approve: (id: string, reason: string) => request<any>(`/api/approvals/${id}/approve`, { method: 'POST', body: JSON.stringify({ reason }) }),
+    reject: (id: string, reason: string) => request<any>(`/api/approvals/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  },
+  audit: {
+    listEvents: (limit = 100) => request<any[]>(`/api/audit/events?limit=${limit}`),
+    recommendationTimeline: (id: string) => request<any>(`/api/audit/recommendations/${id}/timeline`),
   },
 }

@@ -26,3 +26,6 @@ export function queryKey(id: string) { return `query/${id}` }
 export function explainKey(id: string) { return `explain/${id}` }
 export function analysisKey(id: string) { return `analysis/${id}` }
 export function suggestionKey(id: string) { return `suggestion/${id}` }
+export function policyKey(id: string) { return `policy/${id}` }
+export function approvalKey(id: string) { return `approval/${id}` }
+export function auditKey(id: string) { return `audit/${id}` }

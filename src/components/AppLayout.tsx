@@ -1,9 +1,12 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, Lightbulb, Mail, Settings, Plus, Zap } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, Mail, Settings, Plus, Zap, ShieldCheck, ClipboardCheck, ScrollText } from 'lucide-react'
 
 const navLinks = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/suggestions', icon: Lightbulb, label: 'Suggestions' },
+  { to: '/guardrails', icon: ShieldCheck, label: 'Guardrails' },
+  { to: '/approvals', icon: ClipboardCheck, label: 'Approvals' },
+  { to: '/audit', icon: ScrollText, label: 'Audit' },
   { to: '/digest', icon: Mail, label: 'Digest' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
@@ -23,8 +26,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Zap size={16} className="text-white" />
             </div>
             <div>
-              <div className="text-sm font-bold text-white leading-none">QuerySage</div>
-              <div className="text-xs text-slate-500 leading-none mt-0.5">AI Query Optimizer</div>
+              <div className="text-sm font-bold text-white leading-none">Postgres Guardrails</div>
+              <div className="text-xs text-slate-500 leading-none mt-0.5">Safe, provable performance</div>
             </div>
           </Link>
         </div>
