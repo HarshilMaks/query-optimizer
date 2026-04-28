@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import { listByPrefix } from './lib/storage.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -7,7 +8,8 @@ function json(data: unknown, status = 200) {
 
 export default async (req: Request, _ctx: Context) => {
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
-  const tenantId = 'default'
+
+  const { tenantId } = getRequestContext(req)
   const url = new URL(req.url)
   const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit') ?? 100), 500))
 
@@ -20,4 +22,3 @@ export default async (req: Request, _ctx: Context) => {
 }
 
 export const config = { path: '/api/audit/events' }
-

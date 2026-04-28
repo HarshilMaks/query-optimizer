@@ -340,6 +340,8 @@ function QueryDetailPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={s.status}>{s.status}</Badge>
+                      {s.policy_decision && <Badge variant={s.policy_decision as any}>{s.policy_decision}</Badge>}
+                      {s.approval_status && <Badge variant={s.approval_status as any}>{s.approval_status}</Badge>}
                     </div>
                   </div>
                   <div className="p-4">
@@ -352,9 +354,15 @@ function QueryDetailPage() {
                       </button>
                     </div>
                     {s.status === 'pending' && (
-                      <button onClick={() => handleApplySuggestion(s.id)} className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
-                        <CheckCircle2 size={14} /> Mark as Applied
-                      </button>
+                      s.policy_decision === 'blocked' ? (
+                        <p className="mt-3 text-xs text-red-400">Blocked by active guardrail policy</p>
+                      ) : s.policy_decision === 'approval_required' && s.approval_status !== 'approved' ? (
+                        <p className="mt-3 text-xs text-amber-400">Manual approval required before apply</p>
+                      ) : (
+                        <button onClick={() => handleApplySuggestion(s.id)} className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
+                          <CheckCircle2 size={14} /> Mark as Applied
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -384,9 +392,15 @@ function QueryDetailPage() {
                         {copied === `rw-${s.id}` ? <CheckCircle2 size={11} className="text-emerald-400" /> : <Copy size={11} />} Copy Rewritten
                       </button>
                       {s.status === 'pending' && (
-                        <button onClick={() => handleApplySuggestion(s.id)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs rounded-lg transition-colors">
-                          <CheckCircle2 size={11} /> Mark Applied
-                        </button>
+                        s.policy_decision === 'blocked' ? (
+                          <span className="text-xs text-red-400">Blocked by policy</span>
+                        ) : s.policy_decision === 'approval_required' && s.approval_status !== 'approved' ? (
+                          <span className="text-xs text-amber-400">Approval required</span>
+                        ) : (
+                          <button onClick={() => handleApplySuggestion(s.id)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs rounded-lg transition-colors">
+                            <CheckCircle2 size={11} /> Mark Applied
+                          </button>
+                        )
                       )}
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-// API client for QuerySage backend
+// API client for Postgres Guardrail Platform
 
 const BASE = ''
 
@@ -14,7 +14,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// Connections
 export const api = {
   connections: {
     list: () => request<any[]>('/api/connections'),
@@ -22,7 +21,7 @@ export const api = {
     create: (data: any) => request<any>('/api/connections', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => request<any>(`/api/connections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/api/connections/${id}`, { method: 'DELETE' }),
-    test: (id: string) => request<any>(`/api/connections/${id}/test`, { method: 'POST' }),
+    test: (id: string) => request<any>(`/api/connections/${id}/test`, { method: 'POST', body: JSON.stringify({}) }),
   },
   queries: {
     list: (connectionId?: string) => request<any[]>(`/api/queries${connectionId ? `?connection_id=${connectionId}` : ''}`),
@@ -58,5 +57,12 @@ export const api = {
   audit: {
     listEvents: (limit = 100) => request<any[]>(`/api/audit/events?limit=${limit}`),
     recommendationTimeline: (id: string) => request<any>(`/api/audit/recommendations/${id}/timeline`),
+  },
+  runs: {
+    list: () => request<any[]>('/api/runs'),
+    scan: (connectionId?: string) => request<any>('/api/runs/scan', { method: 'POST', body: JSON.stringify(connectionId ? { connection_id: connectionId } : {}) }),
+  },
+  admin: {
+    resetAll: () => request<any>('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirm: 'DELETE_ALL' }) }),
   },
 }

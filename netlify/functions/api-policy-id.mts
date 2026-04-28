@@ -1,13 +1,14 @@
 import type { Context } from '@netlify/functions'
 import { getItem, listByPrefix, policyKey, setItem } from './lib/storage.js'
 import { appendAuditEvent } from './lib/audit.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
 }
 
 export default async (req: Request, ctx: Context) => {
-  const tenantId = 'default'
+  const { tenantId, actorId } = getRequestContext(req)
   const { id } = ctx.params
   const current = await getItem<any>(policyKey(id))
   if (!current || current.tenant_id !== tenantId) return json({ error: 'Policy not found' }, 404)
@@ -37,6 +38,7 @@ export default async (req: Request, ctx: Context) => {
   await setItem(policyKey(id), next)
   await appendAuditEvent({
     tenant_id: tenantId,
+    actor_id: actorId,
     entity_type: 'policy',
     entity_id: id,
     action: 'policy.updated',
@@ -47,4 +49,3 @@ export default async (req: Request, ctx: Context) => {
 }
 
 export const config = { path: '/api/policies/:id' }
-

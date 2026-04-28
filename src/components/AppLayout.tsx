@@ -1,11 +1,12 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, Lightbulb, Mail, Settings, Plus, Zap, ShieldCheck, ClipboardCheck, ScrollText } from 'lucide-react'
+import { LayoutDashboard, Lightbulb, Mail, Settings, Plus, Zap, ShieldCheck, ClipboardCheck, ScrollText, Activity } from 'lucide-react'
 
 const navLinks = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/suggestions', icon: Lightbulb, label: 'Suggestions' },
   { to: '/guardrails', icon: ShieldCheck, label: 'Guardrails' },
   { to: '/approvals', icon: ClipboardCheck, label: 'Approvals' },
+  { to: '/runs', icon: Activity, label: 'Runs' },
   { to: '/audit', icon: ScrollText, label: 'Audit' },
   { to: '/digest', icon: Mail, label: 'Digest' },
   { to: '/settings', icon: Settings, label: 'Settings' },
@@ -17,9 +18,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
-      {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
-        {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-800">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -32,7 +31,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navLinks.map(({ to, icon: Icon, label }) => {
             const active = path === to || path.startsWith(to + '/')
@@ -49,7 +47,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Add Connection CTA */}
         <div className="p-3 border-t border-slate-800">
           <Link
             to="/connect"
@@ -61,7 +58,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-auto">
         {children}
       </main>
@@ -69,8 +65,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
-// Badge component
-export function Badge({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'pending' | 'analyzed' | 'optimized' | 'index' | 'rewrite' | 'config' | 'applied' | 'dismissed' | 'critical' | 'warning' | 'info' | 'connected' | 'disconnected' | 'error' }) {
+export function Badge({
+  children,
+  variant = 'default',
+}: {
+  children: React.ReactNode
+  variant?: 'default' | 'pending' | 'analyzed' | 'optimized' | 'index' | 'rewrite' | 'config' | 'applied' | 'dismissed' | 'critical' | 'warning' | 'info' | 'connected' | 'disconnected' | 'error' | 'approval_required' | 'blocked' | 'approved' | 'running' | 'succeeded' | 'failed' | 'partial'
+}) {
   const styles: Record<string, string> = {
     default: 'bg-slate-700 text-slate-300',
     pending: 'bg-amber-900/50 text-amber-400 border border-amber-700/50',
@@ -87,6 +88,13 @@ export function Badge({ children, variant = 'default' }: { children: React.React
     connected: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700/50',
     disconnected: 'bg-slate-700/50 text-slate-400 border border-slate-600/50',
     error: 'bg-red-900/50 text-red-400 border border-red-700/50',
+    approval_required: 'bg-amber-900/50 text-amber-400 border border-amber-700/50',
+    blocked: 'bg-red-900/50 text-red-400 border border-red-700/50',
+    approved: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700/50',
+    running: 'bg-blue-900/50 text-blue-400 border border-blue-700/50',
+    succeeded: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700/50',
+    failed: 'bg-red-900/50 text-red-400 border border-red-700/50',
+    partial: 'bg-amber-900/50 text-amber-400 border border-amber-700/50',
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[variant] ?? styles.default}`}>
@@ -95,7 +103,6 @@ export function Badge({ children, variant = 'default' }: { children: React.React
   )
 }
 
-// Stat card
 export function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -106,7 +113,6 @@ export function StatCard({ label, value, sub, accent }: { label: string; value: 
   )
 }
 
-// Loading skeleton
 export function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`bg-slate-800 rounded animate-pulse ${className}`} />
 }

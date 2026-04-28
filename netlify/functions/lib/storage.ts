@@ -5,8 +5,13 @@ const store = getStore({ name: 'querysage', consistency: 'strong' })
 export async function listByPrefix(prefix: string): Promise<any[]> {
   const { blobs } = await store.list({ prefix })
   if (blobs.length === 0) return []
-  const items = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))
+  const items = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))
   return items.filter(Boolean) as any[]
+}
+
+export async function listKeysByPrefix(prefix: string): Promise<string[]> {
+  const { blobs } = await store.list({ prefix })
+  return blobs.map((b) => b.key)
 }
 
 export async function getItem<T>(key: string): Promise<T | null> {
@@ -29,3 +34,4 @@ export function suggestionKey(id: string) { return `suggestion/${id}` }
 export function policyKey(id: string) { return `policy/${id}` }
 export function approvalKey(id: string) { return `approval/${id}` }
 export function auditKey(id: string) { return `audit/${id}` }
+export function runKey(id: string) { return `run/${id}` }

@@ -3,6 +3,7 @@ import { getItem, setItem, listByPrefix, queryKey, explainKey, analysisKey, sugg
 import { analyzeExecutionPlan, checkRateLimit } from './lib/gemini.js'
 import { assessSuggestion, getActivePolicy } from './lib/guardrails.js'
 import { appendAuditEvent } from './lib/audit.js'
+import { getRequestContext } from './lib/request-context.js'
 import type { SlowQuery } from './api-queries.mjs'
 
 function json(data: unknown, status = 200) {
@@ -18,7 +19,7 @@ export default async (req: Request, ctx: Context) => {
 
   const query = await getItem<SlowQuery>(queryKey(id))
   if (!query) return json({ error: 'Query not found' }, 404)
-  const tenantId = 'default'
+  const { tenantId, actorId } = getRequestContext(req)
 
   // Get most recent explain result
   const explains = (await listByPrefix('explain/')).filter((e: any) => e.query_id === id)
@@ -47,6 +48,7 @@ export default async (req: Request, ctx: Context) => {
     await setItem(analysisKey(analysisId), analysis)
     await appendAuditEvent({
       tenant_id: tenantId,
+      actor_id: actorId,
       entity_type: 'analysis',
       entity_id: analysisId,
       action: 'analysis.created',
@@ -78,7 +80,8 @@ export default async (req: Request, ctx: Context) => {
       suggestions.push(suggestion)
       await appendAuditEvent({
         tenant_id: tenantId,
-        entity_type: 'suggestion',
+      actor_id: actorId,
+      entity_type: 'suggestion',
         entity_id: sid,
         action: 'suggestion.created',
         reason: assessed.decision_reason,
@@ -101,7 +104,8 @@ export default async (req: Request, ctx: Context) => {
         })
         await appendAuditEvent({
           tenant_id: tenantId,
-          entity_type: 'approval',
+      actor_id: actorId,
+      entity_type: 'approval',
           entity_id: approvalId,
           action: 'approval.requested',
           reason: assessed.decision_reason,
@@ -134,7 +138,8 @@ export default async (req: Request, ctx: Context) => {
       suggestions.push(suggestion)
       await appendAuditEvent({
         tenant_id: tenantId,
-        entity_type: 'suggestion',
+      actor_id: actorId,
+      entity_type: 'suggestion',
         entity_id: sid,
         action: 'suggestion.created',
         reason: assessed.decision_reason,
@@ -157,7 +162,8 @@ export default async (req: Request, ctx: Context) => {
         })
         await appendAuditEvent({
           tenant_id: tenantId,
-          entity_type: 'approval',
+      actor_id: actorId,
+      entity_type: 'approval',
           entity_id: approvalId,
           action: 'approval.requested',
           reason: assessed.decision_reason,
@@ -170,6 +176,7 @@ export default async (req: Request, ctx: Context) => {
     await setItem(queryKey(id), { ...query, status: 'analyzed' })
     await appendAuditEvent({
       tenant_id: tenantId,
+      actor_id: actorId,
       entity_type: 'query',
       entity_id: id,
       action: 'query.analyzed',

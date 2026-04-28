@@ -1,28 +1,30 @@
 import type { Context } from '@netlify/functions'
 import { getItem, listByPrefix, connKey, queryKey } from './lib/storage.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
 }
 
-export default async (req: Request, ctx: Context) => {
+export default async (req: Request, _ctx: Context) => {
   if (req.method === 'GET') {
+    const { tenantId } = getRequestContext(req)
     const url = new URL(req.url)
     const status = url.searchParams.get('status')
     const connectionId = url.searchParams.get('connection_id')
     const type = url.searchParams.get('type')
 
-    let suggestions = await listByPrefix('suggestion/') as any[]
-    if (status) suggestions = suggestions.filter(s => s.status === status)
-    if (type) suggestions = suggestions.filter(s => s.suggestion_type === type)
+    let suggestions = (await listByPrefix('suggestion/')) as any[]
+    suggestions = suggestions.filter((s) => !s.tenant_id || s.tenant_id === tenantId)
+    if (status) suggestions = suggestions.filter((s) => s.status === status)
+    if (type) suggestions = suggestions.filter((s) => s.suggestion_type === type)
 
     if (connectionId) {
       const queries = (await listByPrefix('query/')).filter((q: any) => q.connection_id === connectionId)
       const qIds = new Set(queries.map((q: any) => q.id))
-      suggestions = suggestions.filter(s => qIds.has(s.query_id))
+      suggestions = suggestions.filter((s) => qIds.has(s.query_id))
     }
 
-    // Enrich with query preview and connection name
     const enriched = await Promise.all(suggestions.map(async (s) => {
       const q = await getItem<any>(queryKey(s.query_id))
       const conn = q ? await getItem<any>(connKey(q.connection_id)) : null

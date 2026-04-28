@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import { listByPrefix } from './lib/storage.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -8,7 +9,7 @@ function json(data: unknown, status = 200) {
 export default async (req: Request, ctx: Context) => {
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
-  const tenantId = 'default'
+  const { tenantId } = getRequestContext(req)
   const { id } = ctx.params
   const events = (await listByPrefix('audit/'))
     .filter((e: any) => e.tenant_id === tenantId)
@@ -22,4 +23,3 @@ export default async (req: Request, ctx: Context) => {
 }
 
 export const config = { path: '/api/audit/recommendations/:id/timeline' }
-

@@ -2,13 +2,14 @@ import type { Context } from '@netlify/functions'
 import { listByPrefix, setItem, policyKey } from './lib/storage.js'
 import { appendAuditEvent } from './lib/audit.js'
 import { DEFAULT_POLICY_RULES, getActivePolicy } from './lib/guardrails.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
 }
 
 export default async (req: Request, _ctx: Context) => {
-  const tenantId = 'default'
+  const { tenantId, actorId } = getRequestContext(req)
 
   if (req.method === 'GET') {
     await getActivePolicy(tenantId)
@@ -45,6 +46,7 @@ export default async (req: Request, _ctx: Context) => {
     await setItem(policyKey(id), policy)
     await appendAuditEvent({
       tenant_id: tenantId,
+      actor_id: actorId,
       entity_type: 'policy',
       entity_id: id,
       action: 'policy.created',
@@ -58,4 +60,3 @@ export default async (req: Request, _ctx: Context) => {
 }
 
 export const config = { path: '/api/policies' }
-

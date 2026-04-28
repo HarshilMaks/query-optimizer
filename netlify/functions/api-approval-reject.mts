@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, approvalKey, suggestionKey } from './lib/storage.js'
 import { appendAuditEvent } from './lib/audit.js'
+import { getRequestContext } from './lib/request-context.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -9,7 +10,7 @@ function json(data: unknown, status = 200) {
 export default async (req: Request, ctx: Context) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  const tenantId = 'default'
+  const { tenantId, actorId } = getRequestContext(req)
   const { id } = ctx.params
   const approval = await getItem<any>(approvalKey(id))
   if (!approval || approval.tenant_id !== tenantId) return json({ error: 'Approval not found' }, 404)
@@ -21,7 +22,7 @@ export default async (req: Request, ctx: Context) => {
     ...approval,
     status: 'rejected',
     decided_at: resolvedAt,
-    decided_by: body.actor_id ?? 'reviewer',
+    decided_by: actorId,
     decision_reason: body.reason ?? 'Rejected by reviewer',
   }
   await setItem(approvalKey(id), updated)
@@ -52,4 +53,3 @@ export default async (req: Request, ctx: Context) => {
 }
 
 export const config = { path: '/api/approvals/:id/reject' }
-
