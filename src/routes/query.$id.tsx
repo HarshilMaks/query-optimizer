@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Badge, Skeleton } from '@/components/AppLayout'
-import { Play, Brain, Copy, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react'
+import { ValidationResult } from '@/components/ValidationResult'
+import { Play, Brain, Copy, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, AlertCircle, Zap } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge, Position } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -86,6 +87,7 @@ function QueryDetailPage() {
   const [applyModal, setApplyModal] = useState<any | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
+  const [validationState, setValidationState] = useState<Record<string, any>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -119,6 +121,31 @@ function QueryDetailPage() {
       setAnalyzeError(err.message)
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  async function handleRunValidation(suggestionId: string, connectionId: string) {
+    setValidationState(prev => ({ ...prev, [suggestionId]: { loading: true } }))
+    try {
+      const result = await api.validation.run(suggestionId, connectionId)
+      setValidationState(prev => ({ ...prev, [suggestionId]: result }))
+      // Poll for completion
+      const pollValidation = setInterval(async () => {
+        try {
+          const updated = await api.validation.get(result.id)
+          if (updated.status !== 'running' && updated.status !== 'pending') {
+            clearInterval(pollValidation)
+            setValidationState(prev => ({ ...prev, [suggestionId]: updated }))
+          }
+        } catch (err) {
+          clearInterval(pollValidation)
+        }
+      }, 1000)
+    } catch (err: any) {
+      setValidationState(prev => ({ 
+        ...prev, 
+        [suggestionId]: { error: err.message, status: 'failed' } 
+      }))
     }
   }
 
@@ -353,16 +380,35 @@ function QueryDetailPage() {
                         {copied === s.id ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
+                    {validationState[s.id] && (
+                      <div className="mt-3">
+                        <ValidationResult 
+                          validation={validationState[s.id]}
+                          loading={validationState[s.id].loading}
+                          error={validationState[s.id].error}
+                        />
+                      </div>
+                    )}
                     {s.status === 'pending' && (
-                      s.policy_decision === 'blocked' ? (
-                        <p className="mt-3 text-xs text-red-400">Blocked by active guardrail policy</p>
-                      ) : s.policy_decision === 'approval_required' && s.approval_status !== 'approved' ? (
-                        <p className="mt-3 text-xs text-amber-400">Manual approval required before apply</p>
-                      ) : (
-                        <button onClick={() => handleApplySuggestion(s.id)} className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
-                          <CheckCircle2 size={14} /> Mark as Applied
-                        </button>
-                      )
+                      <div className="mt-3 flex items-center gap-2">
+                        {!validationState[s.id]?.status && (
+                          <button 
+                            onClick={() => handleRunValidation(s.id, detail?.connection_id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            <Zap size={14} /> Run Validation
+                          </button>
+                        )}
+                        {s.policy_decision === 'blocked' ? (
+                          <p className="text-xs text-red-400">Blocked by active guardrail policy</p>
+                        ) : s.policy_decision === 'approval_required' && s.approval_status !== 'approved' ? (
+                          <p className="text-xs text-amber-400">Manual approval required before apply</p>
+                        ) : (
+                          <button onClick={() => handleApplySuggestion(s.id)} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
+                            <CheckCircle2 size={14} /> Mark as Applied
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

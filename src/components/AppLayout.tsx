@@ -70,7 +70,7 @@ export function Badge({
   variant = 'default',
 }: {
   children: React.ReactNode
-  variant?: 'default' | 'pending' | 'analyzed' | 'optimized' | 'index' | 'rewrite' | 'config' | 'applied' | 'dismissed' | 'critical' | 'warning' | 'info' | 'connected' | 'disconnected' | 'error' | 'approval_required' | 'blocked' | 'approved' | 'running' | 'succeeded' | 'failed' | 'partial'
+  variant?: 'default' | 'pending' | 'analyzed' | 'optimized' | 'index' | 'rewrite' | 'config' | 'applied' | 'dismissed' | 'critical' | 'warning' | 'info' | 'connected' | 'disconnected' | 'error' | 'approval_required' | 'blocked' | 'approved' | 'running' | 'succeeded' | 'failed' | 'partial' | 'validating' | 'validated'
 }) {
   const styles: Record<string, string> = {
     default: 'bg-slate-700 text-slate-300',
@@ -95,6 +95,8 @@ export function Badge({
     succeeded: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700/50',
     failed: 'bg-red-900/50 text-red-400 border border-red-700/50',
     partial: 'bg-amber-900/50 text-amber-400 border border-amber-700/50',
+    validating: 'bg-blue-900/50 text-blue-400 border border-blue-700/50',
+    validated: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700/50',
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[variant] ?? styles.default}`}>

@@ -65,4 +65,15 @@ export const api = {
   admin: {
     resetAll: () => request<any>('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirm: 'DELETE_ALL' }) }),
   },
+  validation: {
+    run: (suggestionId: string, connectionId: string) => 
+      request<any>('/api/validation', { method: 'POST', body: JSON.stringify({ suggestionId, connectionId }) }),
+    get: (validationId: string) => request<any>(`/api/validation/${validationId}`),
+    list: (suggestionId?: string, limit?: number) => {
+      const params = new URLSearchParams()
+      if (suggestionId) params.append('suggestionId', suggestionId)
+      if (limit) params.append('limit', limit.toString())
+      return request<any[]>(`/api/validations${params.toString() ? `?${params.toString()}` : ''}`)
+    },
+  },
 }
