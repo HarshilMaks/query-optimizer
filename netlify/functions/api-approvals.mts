@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { getItem, listByPrefix, suggestionKey } from './lib/storage.js'
 import { getRequestContext } from './lib/request-context.js'
+import { requireAuth, checkPermission } from './lib/rbac.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -8,6 +9,13 @@ function json(data: unknown, status = 200) {
 
 export default async (req: Request, _ctx: Context) => {
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+
+  // Require authentication to view approvals
+  try {
+    requireAuth(req)
+  } catch (error) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
 
   const { tenantId } = getRequestContext(req)
   const url = new URL(req.url)

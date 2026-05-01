@@ -4,8 +4,17 @@ import { api } from '@/lib/api'
 import { Link } from '@tanstack/react-router'
 import { Zap, CheckCircle2, XCircle, Loader2, Database, Shield, Wifi } from 'lucide-react'
 import { Badge } from '@/components/AppLayout'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/connect')({ component: ConnectPage })
+export const Route = createFileRoute('/connect')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: ConnectPage,
+})
 
 interface ConnectionForm {
   name: string; host: string; port: string; database_name: string

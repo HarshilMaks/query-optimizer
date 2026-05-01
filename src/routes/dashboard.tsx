@@ -1,10 +1,19 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, StatCard, Badge, Skeleton } from '@/components/AppLayout'
 import { RefreshCw, Search, ChevronUp, ChevronDown, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/dashboard')({ component: DashboardPage })
+export const Route = createFileRoute('/dashboard')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: DashboardPage,
+})
 
 type SortKey = 'mean_exec_time_ms' | 'total_calls' | 'total_exec_time_ms' | 'last_seen_at'
 

@@ -3,8 +3,17 @@ import { useEffect, useState } from 'react'
 import { AppLayout, Badge, Skeleton } from '@/components/AppLayout'
 import { api } from '@/lib/api'
 import { Loader2, ShieldCheck } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/guardrails')({ component: GuardrailsPage })
+export const Route = createFileRoute('/guardrails')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: GuardrailsPage,
+})
 
 function GuardrailsPage() {
   const [policies, setPolicies] = useState<any[]>([])

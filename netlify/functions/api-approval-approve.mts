@@ -2,6 +2,7 @@ import type { Context } from '@netlify/functions'
 import { getItem, setItem, approvalKey, suggestionKey } from './lib/storage.js'
 import { appendAuditEvent } from './lib/audit.js'
 import { getRequestContext } from './lib/request-context.js'
+import { requireAuth, requireRole } from './lib/rbac.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -9,6 +10,14 @@ function json(data: unknown, status = 200) {
 
 export default async (req: Request, ctx: Context) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+
+  // Require admin to approve
+  try {
+    const claims = requireAuth(req)
+    requireRole(claims, 'admin')
+  } catch (error) {
+    return json({ error: 'Unauthorized: Admin role required' }, 401)
+  }
 
   const { tenantId, actorId } = getRequestContext(req)
   const { id } = ctx.params

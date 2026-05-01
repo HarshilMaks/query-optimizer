@@ -7,8 +7,17 @@ import { Play, Brain, Copy, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loade
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge, Position } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/query/$id')({ component: QueryDetailPage })
+export const Route = createFileRoute('/query/$id')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: QueryDetailPage,
+})
 
 // Parse PostgreSQL EXPLAIN JSON into React Flow nodes/edges
 function parsePlanToFlow(plan: any): { nodes: Node[]; edges: Edge[] } {

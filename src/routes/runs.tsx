@@ -3,8 +3,17 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Badge, Skeleton } from '@/components/AppLayout'
 import { Loader2, Play } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/runs')({ component: RunsPage })
+export const Route = createFileRoute('/runs')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: RunsPage,
+})
 
 function RunsPage() {
   const [runs, setRuns] = useState<any[]>([])

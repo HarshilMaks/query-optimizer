@@ -3,8 +3,17 @@ import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Badge, Skeleton } from '@/components/AppLayout'
 import { Download, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/suggestions')({ component: SuggestionsPage })
+export const Route = createFileRoute('/suggestions')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: SuggestionsPage,
+})
 
 function SuggestionsPage() {
   const [suggestions, setSuggestions] = useState<any[]>([])

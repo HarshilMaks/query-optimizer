@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, listByPrefix, connKey } from './lib/storage.js'
 import { encrypt } from './lib/crypto.js'
+import { requireAuth, requireRole } from './lib/rbac.js'
 
 export interface Connection {
   id: string; name: string; host: string; port: number; database_name: string
@@ -17,12 +18,27 @@ function json(data: unknown, status = 200) {
 
 export default async (req: Request, _ctx: Context) => {
   if (req.method === 'GET') {
+    // Require authentication to list connections
+    try {
+      requireAuth(req)
+    } catch (error) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+    
     const connections = await listByPrefix('conn/')
     const safe = connections.map((c: Connection) => ({ ...c, password_encrypted: '[hidden]' }))
     return json(safe)
   }
 
   if (req.method === 'POST') {
+    // Require admin to create connections
+    try {
+      const claims = requireAuth(req)
+      requireRole(claims, 'admin')
+    } catch (error) {
+      return json({ error: 'Unauthorized: Admin role required' }, 401)
+    }
+
     const body = await req.json()
     const { name, host, port, database_name, username, password, ssl_mode } = body
     if (!name || !host || !database_name || !username || !password) {

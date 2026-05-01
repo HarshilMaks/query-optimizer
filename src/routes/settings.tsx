@@ -3,8 +3,17 @@ import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Badge } from '@/components/AppLayout'
 import { Database, Bell, User, Trash2, Loader2, CheckCircle2, XCircle, Pencil, Save, X } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/settings')({ component: SettingsPage })
+export const Route = createFileRoute('/settings')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: SettingsPage,
+})
 
 const TABS = [
   { id: 'connections', label: 'Connections', icon: Database },

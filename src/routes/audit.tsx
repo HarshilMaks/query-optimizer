@@ -2,8 +2,17 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { AppLayout, Skeleton } from '@/components/AppLayout'
 import { api } from '@/lib/api'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/audit')({ component: AuditPage })
+export const Route = createFileRoute('/audit')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: AuditPage,
+})
 
 function AuditPage() {
   const [events, setEvents] = useState<any[]>([])

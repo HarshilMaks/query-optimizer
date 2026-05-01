@@ -4,8 +4,17 @@ import { AppLayout, Badge, Skeleton } from '@/components/AppLayout'
 import { ValidationResult } from '@/components/ValidationResult'
 import { api } from '@/lib/api'
 import { CheckCircle2, Loader2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/approvals')({ component: ApprovalsPage })
+export const Route = createFileRoute('/approvals')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: ApprovalsPage,
+})
 
 function ApprovalsPage() {
   const [items, setItems] = useState<any[]>([])

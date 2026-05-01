@@ -3,8 +3,17 @@ import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Skeleton } from '@/components/AppLayout'
 import { Mail, Send, Eye, Loader2, CheckCircle2, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
+import { getAccessToken } from '@/lib/auth-hooks'
 
-export const Route = createFileRoute('/digest')({ component: DigestPage })
+export const Route = createFileRoute('/digest')({
+  beforeLoad: async () => {
+    const token = getAccessToken()
+    if (!token) {
+      throw new Error('Unauthorized: Please log in')
+    }
+  },
+  component: DigestPage,
+})
 
 function DigestPage() {
   const [loading, setLoading] = useState(true)
