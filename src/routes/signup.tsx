@@ -51,8 +51,8 @@ function SignupPage() {
       localStorage.setItem('refreshToken', tokens.refreshToken)
       localStorage.setItem('user', JSON.stringify(user))
 
-      // Redirect to dashboard
-      navigate({ to: '/dashboard' })
+      // Redirect to email verification
+      navigate({ to: '/verify-email', search: { email } })
     } catch (err) {
       setError('Network error. Please try again.')
       setLoading(false)
