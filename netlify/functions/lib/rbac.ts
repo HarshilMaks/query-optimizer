@@ -3,9 +3,9 @@
  * Enforces role-based permissions on Netlify functions
  */
 
-import type { JWTClaims, UserRole } from '../../src/lib/auth-types.js'
+import type { JWTClaims, UserRole } from '../../../src/lib/auth-types.js'
 import { decodeJWT, extractTokenFromRequest, forbiddenResponse } from './auth.js'
-import { ROLE_PERMISSIONS } from '../../src/lib/auth-types.js'
+import { ROLE_PERMISSIONS } from '../../../src/lib/auth-types.js'
 
 /**
  * Extract and validate JWT claims from request

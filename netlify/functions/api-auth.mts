@@ -43,8 +43,8 @@ export default async (req: Request, _ctx: Context) => {
         }
 
         // Rate limiting: Use email + IP as identifier
-        const identifier = `login:${email}:${getRequestIdentifier(req)}`
-        const rateLimit = checkRateLimit(identifier, RATE_LIMIT_PRESETS.auth)
+        const loginRateLimitKey = `login:${email}:${getRequestIdentifier(req)}`
+        const rateLimit = checkRateLimit(loginRateLimitKey, RATE_LIMIT_PRESETS.auth)
 
         if (!rateLimit.allowed) {
           console.log(`[Rate Limit] Login attempt blocked for ${email}: ${rateLimit.remaining} remaining, retry in ${rateLimit.retryAfter}s`)
@@ -103,8 +103,7 @@ export default async (req: Request, _ctx: Context) => {
         }
 
         // Reset rate limit on successful login
-        const identifier = `login:${user.email}:${getRequestIdentifier(req)}`
-        resetRateLimit(identifier)
+        resetRateLimit(loginRateLimitKey)
 
         const response: AuthResponse = {
           user: {

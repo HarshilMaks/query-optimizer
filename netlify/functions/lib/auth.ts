@@ -3,7 +3,7 @@
  * Handles token generation, validation, and refresh
  */
 
-import type { JWTClaims, UserRole, TokenPair } from '../../src/lib/auth-types.js'
+import type { JWTClaims, UserRole, TokenPair } from '../../../src/lib/auth-types.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-not-for-production'
 const JWT_ALGORITHM = 'HS256'

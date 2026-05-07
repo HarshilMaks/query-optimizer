@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { listByPrefix } from './lib/storage.js'
 import { refreshConnectionQueries } from './lib/query-ingest.js'
+import { requireAuth, requireRole } from './lib/rbac.js'
 
 export interface SlowQuery {
   id: string; connection_id: string; query_hash: string; query_text: string
@@ -19,12 +20,25 @@ export default async (req: Request, _ctx: Context) => {
   const connectionId = url.searchParams.get('connection_id')
 
   if (req.method === 'GET') {
+    try {
+      requireAuth(req)
+    } catch (error) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+
     let queries = await listByPrefix('query/') as SlowQuery[]
     if (connectionId) queries = queries.filter(q => q.connection_id === connectionId)
     return json(queries.sort((a, b) => b.mean_exec_time_ms - a.mean_exec_time_ms))
   }
 
   if (req.method === 'POST') {
+    try {
+      const claims = requireAuth(req)
+      requireRole(claims, 'admin')
+    } catch (error) {
+      return json({ error: 'Unauthorized: Admin role required' }, 401)
+    }
+
     const body = await req.json().catch(() => ({}))
     const connId = body.connection_id ?? connectionId
     if (!connId) return json({ error: 'connection_id required' }, 400)

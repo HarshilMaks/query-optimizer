@@ -1,4 +1,4 @@
-import type { JWTClaims } from '../../src/lib/auth-types.js'
+import type { JWTClaims } from '../../../src/lib/auth-types.js'
 import { decodeJWT, extractTokenFromRequest } from './auth.js'
 
 export interface RequestContext {

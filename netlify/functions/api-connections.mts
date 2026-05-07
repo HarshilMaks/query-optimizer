@@ -1,6 +1,8 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, listByPrefix, connKey } from './lib/storage.js'
 import { encrypt } from './lib/crypto.js'
+import { appendAuditEvent } from './lib/audit.js'
+import { getRequestContext } from './lib/request-context.js'
 import { requireAuth, requireRole } from './lib/rbac.js'
 
 export interface Connection {
@@ -17,6 +19,8 @@ function json(data: unknown, status = 200) {
 }
 
 export default async (req: Request, _ctx: Context) => {
+  const { tenantId, actorId } = getRequestContext(req)
+
   if (req.method === 'GET') {
     // Require authentication to list connections
     try {
@@ -53,6 +57,15 @@ export default async (req: Request, _ctx: Context) => {
       created_at: new Date().toISOString(),
     }
     await setItem(connKey(id), conn)
+    await appendAuditEvent({
+      tenant_id: tenantId,
+      actor_id: actorId,
+      entity_type: 'connection',
+      entity_id: id,
+      action: 'connection.created',
+      reason: 'Database connection created',
+      metadata: { name, host, database_name, ssl_mode: conn.ssl_mode },
+    })
     return json({ ...conn, password_encrypted: '[hidden]' }, 201)
   }
 

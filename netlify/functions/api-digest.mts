@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, listByPrefix } from './lib/storage.js'
 import { Resend } from 'resend'
+import { requireAuth, requireRole } from './lib/rbac.js'
 
 const DIGEST_SETTINGS_KEY = 'digest-settings'
 
@@ -23,6 +24,12 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof buildDigestData>>) {
 }
 
 export default async (req: Request, _ctx: Context) => {
+  try {
+    requireAuth(req)
+  } catch (error) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
+
   const url = new URL(req.url)
   const action = url.pathname.split('/').pop()
 
@@ -35,6 +42,13 @@ export default async (req: Request, _ctx: Context) => {
 
   // PUT /api/digest/settings
   if (req.method === 'PUT') {
+    try {
+      const claims = requireAuth(req)
+      requireRole(claims, 'admin')
+    } catch (error) {
+      return json({ error: 'Unauthorized: Admin role required' }, 401)
+    }
+
     const body = await req.json()
     const current = (await getItem(DIGEST_SETTINGS_KEY)) ?? {}
     await setItem(DIGEST_SETTINGS_KEY, { ...(current as object), ...body, updated_at: new Date().toISOString() })
@@ -43,6 +57,13 @@ export default async (req: Request, _ctx: Context) => {
 
   // POST /api/digest/send
   if (req.method === 'POST') {
+    try {
+      const claims = requireAuth(req)
+      requireRole(claims, 'admin')
+    } catch (error) {
+      return json({ error: 'Unauthorized: Admin role required' }, 401)
+    }
+
     const settings = await getItem<any>(DIGEST_SETTINGS_KEY)
     const body = await req.json().catch(() => ({}))
     const recipient = body.recipient_email ?? settings?.recipient_email

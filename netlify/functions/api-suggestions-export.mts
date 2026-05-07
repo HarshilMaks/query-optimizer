@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, listByPrefix, suggestionKey, queryKey, connKey } from './lib/storage.js'
+import { requireAuth } from './lib/rbac.js'
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status })
@@ -11,6 +12,12 @@ function escapeCSV(v: unknown): string {
 }
 
 export default async (req: Request, _ctx: Context) => {
+  try {
+    requireAuth(req)
+  } catch (error) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
+
   const suggestions = await listByPrefix('suggestion/') as any[]
   const enriched = await Promise.all(suggestions.map(async (s) => {
     const q = await getItem<any>(queryKey(s.query_id))

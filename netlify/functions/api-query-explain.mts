@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import { getItem, setItem, queryKey, connKey, explainKey } from './lib/storage.js'
 import { runExplainAnalyze } from './lib/pg-client.js'
+import { requireAuth } from './lib/rbac.js'
 import type { SlowQuery } from './api-queries.mjs'
 
 function json(data: unknown, status = 200) {
@@ -9,6 +10,12 @@ function json(data: unknown, status = 200) {
 
 export default async (req: Request, ctx: Context) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  try {
+    requireAuth(req)
+  } catch (error) {
+    return json({ error: 'Unauthorized' }, 401)
+  }
+
   const { id } = ctx.params
   const query = await getItem<SlowQuery>(queryKey(id))
   if (!query) return json({ error: 'Query not found' }, 404)
