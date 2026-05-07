@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { AppLayout, Badge } from '@/components/AppLayout'
-import { Database, Bell, User, Trash2, Loader2, CheckCircle2, XCircle, Pencil, Save, X } from 'lucide-react'
+import { Database, Bell, User, Trash2, Loader2, CheckCircle2, XCircle, Pencil, Save, X, Shield, Github } from 'lucide-react'
 import { getAccessToken } from '@/lib/auth-hooks'
 
 export const Route = createFileRoute('/settings')({
@@ -33,9 +33,27 @@ function SettingsPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
+  const [accountForm, setAccountForm] = useState({ fullName: '', email: '' })
+  const [accountMsg, setAccountMsg] = useState('')
+  const [savingAccount, setSavingAccount] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordMsg, setPasswordMsg] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [oauthConnected, setOauthConnected] = useState(false)
+  const [oauthMsg, setOauthMsg] = useState('')
 
   useEffect(() => {
     api.connections.list().then(setConnections).finally(() => setLoading(false))
+    setOauthConnected(localStorage.getItem('oauth.github.connected') === 'true')
+    const userJson = localStorage.getItem('user')
+    if (userJson) {
+      try {
+        const parsed = JSON.parse(userJson)
+        setAccountForm({ fullName: parsed.fullName ?? parsed.name ?? '', email: parsed.email ?? '' })
+      } catch {
+        setAccountForm({ fullName: '', email: '' })
+      }
+    }
   }, [])
 
   async function handleTest(id: string) {
@@ -85,6 +103,81 @@ function SettingsPage() {
       setResetting(false)
     }
   }
+
+  async function handleAccountSave() {
+    setSavingAccount(true)
+    setAccountMsg('')
+    try {
+      const userJson = localStorage.getItem('user')
+      if (!userJson) {
+        setAccountMsg('No active session. Please log in again.')
+        return
+      }
+      const parsed = JSON.parse(userJson)
+      const updated = { ...parsed, fullName: accountForm.fullName, name: accountForm.fullName }
+      localStorage.setItem('user', JSON.stringify(updated))
+      setAccountMsg('Profile updated locally.')
+    } catch {
+      setAccountMsg('Failed to update profile.')
+    } finally {
+      setSavingAccount(false)
+    }
+  }
+
+  async function handlePasswordChange() {
+    setSavingPassword(true)
+    setPasswordMsg('')
+    try {
+      const token = getAccessToken()
+      if (!token) {
+        setPasswordMsg('No active session. Please log in again.')
+        return
+      }
+      const res = await fetch('/api/auth/password/change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(passwordForm),
+      })
+      const data = await res.json().catch(() => ({ error: 'Request failed' }))
+      if (!res.ok) {
+        setPasswordMsg(data.error ?? 'Password change failed.')
+        return
+      }
+      setPasswordMsg(data.message ?? 'Password changed successfully.')
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
+  function toggleGithubConnection() {
+    const next = !oauthConnected
+    setOauthConnected(next)
+    localStorage.setItem('oauth.github.connected', String(next))
+    setOauthMsg(next ? 'GitHub marked as connected (local state).' : 'GitHub connection removed (local state).')
+  }
+
+  function getTokenSecurityInfo() {
+    if (typeof window === 'undefined') return { role: 'n/a', tenantId: 'n/a', expires: 'n/a' }
+    const token = getAccessToken()
+    if (!token) return { role: 'n/a', tenantId: 'n/a', expires: 'n/a' }
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const expires = payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'n/a'
+      return {
+        role: payload.role ?? 'n/a',
+        tenantId: payload.tenantId ?? 'n/a',
+        expires,
+      }
+    } catch {
+      return { role: 'n/a', tenantId: 'n/a', expires: 'n/a' }
+    }
+  }
+
+  const tokenInfo = getTokenSecurityInfo()
 
   return (
     <AppLayout>
@@ -200,8 +293,95 @@ function SettingsPage() {
         {tab === 'account' && (
           <div className="max-w-lg space-y-5">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-              <h3 className="font-semibold">Model Configuration</h3>
-              <p className="text-sm text-slate-400">Model access is configured through environment/provider integration. Recommendations are always policy-gated before actionability.</p>
+              <h3 className="font-semibold">Profile</h3>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Full Name</label>
+                <input
+                  value={accountForm.fullName}
+                  onChange={e => setAccountForm(prev => ({ ...prev, fullName: e.target.value }))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Email</label>
+                <input
+                  value={accountForm.email}
+                  disabled
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 text-sm"
+                />
+              </div>
+              <button
+                onClick={handleAccountSave}
+                disabled={savingAccount}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingAccount ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save Profile
+              </button>
+              {accountMsg && <p className="text-xs text-slate-300">{accountMsg}</p>}
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="font-semibold">Change Password</h3>
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  placeholder="Current password"
+                  value={passwordForm.currentPassword}
+                  onChange={e => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={passwordForm.newPassword}
+                  onChange={e => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={passwordForm.confirmPassword}
+                  onChange={e => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handlePasswordChange}
+                disabled={savingPassword}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingPassword ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Update Password
+              </button>
+              {passwordMsg && <p className="text-xs text-slate-300">{passwordMsg}</p>}
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="font-semibold">OAuth Connections</h3>
+              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Github size={14} />
+                  GitHub
+                  <span className={`text-xs ${oauthConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {oauthConnected ? 'Connected' : 'Not Connected'}
+                  </span>
+                </div>
+                <button
+                  onClick={toggleGithubConnection}
+                  className="px-3 py-1.5 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200"
+                >
+                  {oauthConnected ? 'Disconnect' : 'Connect'}
+                </button>
+              </div>
+              {oauthMsg && <p className="text-xs text-slate-300">{oauthMsg}</p>}
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2"><Shield size={14} /> Security</h3>
+              <div className="text-sm text-slate-300 grid grid-cols-1 gap-1">
+                <div>Role: <span className="text-slate-400">{tokenInfo.role}</span></div>
+                <div>Tenant: <span className="text-slate-400">{tokenInfo.tenantId}</span></div>
+                <div>Token Expires: <span className="text-slate-400">{tokenInfo.expires}</span></div>
+              </div>
             </div>
 
             <div className="bg-red-900/10 border border-red-800/50 rounded-xl p-5">
