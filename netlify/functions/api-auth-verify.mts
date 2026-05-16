@@ -5,7 +5,7 @@
 
 import type { Context } from '@netlify/functions'
 import { json, errorResponse } from './lib/auth.js'
-import { getUserByEmail, getUserById } from './lib/db.js'
+import { getUserByEmail } from './lib/db.js'
 import {
   createVerificationCode,
   validateVerificationCode,

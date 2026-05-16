@@ -4,6 +4,7 @@
  */
 
 import crypto from 'crypto'
+import { sendTransactionalEmail } from './email.js'
 
 interface VerificationCode {
   code: string
@@ -258,41 +259,25 @@ export async function sendVerificationEmail(
   code: string,
   appName: string = 'QuerySage'
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  try {
-    const htmlContent = getVerificationEmailHTML(email, code, appName)
-    const textContent = getVerificationEmailText(email, code, appName)
+  const htmlContent = getVerificationEmailHTML(email, code, appName)
+  const textContent = getVerificationEmailText(email, code, appName)
+  const sendResult = await sendTransactionalEmail({
+    to: email,
+    subject: `Verify Your Email Address - ${appName}`,
+    html: htmlContent,
+    text: textContent,
+  })
 
-    // Log to console (mocked)
-    console.log(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📧 VERIFICATION EMAIL (MOCKED - DEV ONLY)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-To: ${email}
-Subject: Verify Your Email Address - ${appName}
-
-${textContent}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    `)
-
-    // TODO: Integrate real email service
-    // const response = await resend.emails.send({
-    //   from: 'noreply@querysage.io',
-    //   to: email,
-    //   subject: 'Verify Your Email Address',
-    //   html: htmlContent,
-    //   text: textContent,
-    // });
-
-    return {
-      success: true,
-      messageId: `mock-${Date.now()}`,
-    }
-  } catch (err) {
-    console.error('Failed to send verification email:', err)
+  if (!sendResult.success) {
     return {
       success: false,
-      error: 'Failed to send verification email',
+      error: sendResult.error || 'Failed to send verification email',
     }
+  }
+
+  return {
+    success: true,
+    messageId: sendResult.messageId,
   }
 }
 

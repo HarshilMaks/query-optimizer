@@ -29,7 +29,7 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     const migration001 = `
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        email VARCHAR(255) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         full_name VARCHAR(255),
         tenant_id VARCHAR(255) NOT NULL,
@@ -37,16 +37,20 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
         is_active BOOLEAN DEFAULT TRUE,
         last_login_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (id, tenant_id)
       );
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
       CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active) WHERE is_active = TRUE;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_users_tenant_email_lower ON users(tenant_id, LOWER(email));
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_users_id_tenant ON users(id, tenant_id);
 
       CREATE TABLE IF NOT EXISTS sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL,
+        tenant_id VARCHAR(255) NOT NULL,
         refresh_token_hash VARCHAR(255) NOT NULL,
         access_token_hash VARCHAR(255),
         ip_address VARCHAR(45),
@@ -54,12 +58,18 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
         expires_at TIMESTAMP NOT NULL,
         last_activity_at TIMESTAMP DEFAULT NOW(),
         revoked_at TIMESTAMP,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT fk_sessions_user_tenant
+          FOREIGN KEY (user_id, tenant_id)
+          REFERENCES users(id, tenant_id)
+          ON DELETE CASCADE
       );
 
       CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at) WHERE revoked_at IS NULL;
       CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token_hash ON sessions(refresh_token_hash);
+      CREATE INDEX IF NOT EXISTS idx_sessions_tenant_user ON sessions(tenant_id, user_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_tenant_revoked_expires ON sessions(tenant_id, revoked_at, expires_at DESC);
 
       CREATE TABLE IF NOT EXISTS audit_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,6 +93,67 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_created ON audit_logs(tenant_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_action_created ON audit_logs(tenant_id, action, created_at DESC);
+
+      -- Harden legacy schemas in-place for tenant isolation and constraints
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
+      ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_user_id_fkey;
+      ALTER TABLE sessions ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(255);
+      UPDATE sessions s
+      SET tenant_id = u.tenant_id
+      FROM users u
+      WHERE s.user_id = u.id AND s.tenant_id IS NULL;
+      ALTER TABLE sessions ALTER COLUMN tenant_id SET NOT NULL;
+
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_user_tenant'
+        ) THEN
+          ALTER TABLE sessions
+          ADD CONSTRAINT fk_sessions_user_tenant
+          FOREIGN KEY (user_id, tenant_id)
+          REFERENCES users(id, tenant_id)
+          ON DELETE CASCADE;
+        END IF;
+      END;
+      \$\$;
+
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'chk_users_tenant_nonempty'
+        ) THEN
+          ALTER TABLE users
+          ADD CONSTRAINT chk_users_tenant_nonempty
+          CHECK (length(trim(tenant_id)) > 0);
+        END IF;
+      END;
+      \$\$;
+
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'chk_sessions_expires_after_created'
+        ) THEN
+          ALTER TABLE sessions
+          ADD CONSTRAINT chk_sessions_expires_after_created
+          CHECK (expires_at > created_at);
+        END IF;
+      END;
+      \$\$;
+
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'chk_audit_logs_status'
+        ) THEN
+          ALTER TABLE audit_logs
+          ADD CONSTRAINT chk_audit_logs_status
+          CHECK (status IN ('success', 'failure'));
+        END IF;
+      END;
+      \$\$;
 
       CREATE OR REPLACE FUNCTION update_users_updated_at()
       RETURNS TRIGGER AS \$\$
@@ -151,7 +222,7 @@ export async function getUserById(userId: string): Promise<any | null> {
 export async function createUser(email: string, passwordHash: string, fullName?: string): Promise<any> {
   try {
     const result = await getPool().query(
-      'INSERT INTO users (email, password_hash, full_name, tenant_id, roles) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, tenant_id, roles',
+      'INSERT INTO users (email, password_hash, full_name, tenant_id, roles) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, tenant_id, roles, created_at, updated_at',
       [email, passwordHash, fullName || email.split('@')[0], 'default', ['viewer']]
     )
     return result.rows[0]
@@ -164,11 +235,11 @@ export async function createUser(email: string, passwordHash: string, fullName?:
 /**
  * Create session for user
  */
-export async function createSession(userId: string, refreshTokenHash: string, expiresAt: Date): Promise<any> {
+export async function createSession(userId: string, tenantId: string, refreshTokenHash: string, expiresAt: Date): Promise<any> {
   try {
     const result = await getPool().query(
-      'INSERT INTO sessions (user_id, refresh_token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id, user_id, expires_at',
-      [userId, refreshTokenHash, expiresAt]
+      'INSERT INTO sessions (user_id, tenant_id, refresh_token_hash, expires_at) VALUES ($1, $2, $3, $4) RETURNING id, user_id, tenant_id, expires_at',
+      [userId, tenantId, refreshTokenHash, expiresAt]
     )
     return result.rows[0]
   } catch (error) {

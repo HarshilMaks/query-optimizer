@@ -1,231 +1,194 @@
 # QuerySage
 
-> **Multi‑tenant PostgreSQL Performance Platform**
+QuerySage is a multi-tenant PostgreSQL query optimization platform. It captures slow queries, analyzes execution plans, generates AI-assisted optimization suggestions, enforces guardrails and approvals, and keeps an auditable operational trail.
 
----
+## What this product is for
 
-## 1. What QuerySage Is
-QuerySage is a production‑grade advisory platform that continuously monitors PostgreSQL instances, detects slow queries, runs `EXPLAIN ANALYZE`, and sends the execution plans to Google Gemini (or compatible LLM) for automated bottleneck analysis and safe optimization suggestions.  All recommendations are presented to the user for review and manual application; the system never mutates customer data on its own.
+QuerySage is built for platform teams, DBAs, and backend engineers who need a safer and more repeatable workflow for query performance improvement.
 
----
+Primary outcomes:
 
-## 2. Problem Statement and Scope
-* **Problem** – Database teams spend valuable time hunting down inefficient queries, interpreting raw planner output, and manually crafting indexes or query rewrites.  Errors in DDL can cause outages.
-* **Scope** – QuerySage solves the *diagnosis* and *advisory* phases: it ingests queries, analyses plans with AI, scores confidence, and enforces guard‑rail policies before a suggestion can be approved.  It **does not** automatically execute DDL, run migrations, or alter production data.
+- Detect slow or expensive queries quickly.
+- Understand root-cause bottlenecks from execution plans.
+- Generate optimization suggestions with clear rationale.
+- Validate improvements before rollout.
+- Enforce governance through RBAC, policy guardrails, approvals, and audit history.
 
----
+## Scope and non-goals
 
-## 3. Core Capabilities (status)
-| Capability | Implemented | Notes |
-|------------|------------|-------|
-| Query ingestion / scanning (`pg_stat_statements`) | ✅ | Reads only, read‑only DB role required |
-| `EXPLAIN ANALYZE` + AI analysis | ✅ | Gemini integration; fallback can be added |
-| Suggestion lifecycle (pending → approved → applied / dismissed) | ✅ | UI tracks state, CSV export available |
-| Guardrail policies & approval gates | ✅ | Configurable per‑tenant policies |
-| Validation & confidence scoring | ✅ | Confidence % returned from AI prompt |
-| Auth / RBAC / audit / password reset / email verification | ✅ | Netlify Identity + JWT refresh tokens |
-| Rate limiting | ✅ | Configurable per‑tenant limits |
-| Weekly digest / email surfaces | ✅ | Powered by Resend API |
+In scope:
 
----
+- Recommendation lifecycle: detect, analyze, approve, apply tracking, validate, audit.
+- Authentication and authorization for a multi-tenant platform.
+- Policy-based controls on risky suggestions.
 
-## 4. System Architecture
+Out of scope:
+
+- Automatic execution of optimization SQL in customer databases.
+- Complete identity federation and social account linking (partially implemented).
+- Full production-hardening of every auth flow persistence path (some MVP paths still in-memory).
+
+## Current implementation status
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Slow query ingestion and dashboarding | Implemented | Query/runs workflows available |
+| EXPLAIN + AI analysis | Implemented | Gemini-based analysis and suggestion generation |
+| Suggestion lifecycle + approvals + audit | Implemented | Policy and approval APIs available |
+| Validation engine | Implemented | Before/after capture with confidence scoring |
+| Core auth (JWT, refresh, RBAC) | Implemented | Includes tenant-aware schema hardening |
+| Password reset | Implemented (MVP) | Flow exists; persistence path is not fully durable yet |
+| Email verification | Implemented (MVP) | Flow exists; persistence path is not fully durable yet |
+| Account settings UI | Implemented (MVP) | Profile/password/security screens present |
+| Session management UI (view/revoke active sessions) | Planned | Pending |
+| GitHub OAuth integration | Planned | Pending end-to-end implementation |
+
+## Architecture overview
+
+```text
+Frontend (TanStack Start + React)
+  -> API layer (Netlify Functions)
+    -> Domain services (auth, guardrails, analysis, validation)
+      -> Storage
+         - Netlify Blobs (operational objects, audit chain, suggestions, runs)
+         - PostgreSQL (users, sessions, audit_logs, validation DB access)
+      -> AI provider (Gemini) for execution-plan analysis
 ```
-+------------------------+      +-----------------------+
-|   Frontend (React 19) |<---->| Netlify Functions API |
-|   TanStack Start       |      |   - Auth (JWT)        |
-|   Tailwind CSS 4       |      |   - Query endpoints   |
-+------------------------+      |   - Suggestion logic |
-        |                         +-----------------------+
-        |                                   |
-        v                                   v
-+----------------------+       +-------------------------+
-|  Netlify Blobs (KV)  |<----->|  PostgreSQL (read‑only) |
-|  Encrypted secrets   |       |  pg_stat_statements      |
-+----------------------+       +-------------------------+
-        ^                                   ^
-        |                                   |
-        |   AI Integration (Gemini)          |
-        +-----------------------------------+
-```
-* **Frontend** – TanStack Start + TanStack Router provides type‑safe, file‑based routing.
-* **API layer** – Netlify Functions run on the edge, exposing a REST‑style JSON API.
-* **Storage** – Connection credentials are stored encrypted in Netlify Blobs; suggestions, audits, and policies are persisted there as well.
-* **Multi‑tenant context** – Each request carries a tenant identifier derived from the authenticated user; all data is isolated per tenant.
 
----
+## Core workflows
 
-## 5. Security and Compliance Model
-| Aspect | Detail |
-|--------|--------|
-| **Auth strategy** | JWT access token + refresh token issued by Netlify Identity. Tokens are short‑lived (15 min) and rotated via refresh endpoint. |
-| **RBAC** | Roles: `admin`, `engineer`, `viewer`. Permissions are enforced in the API layer for each endpoint. |
-| **Audit logging** | Every API call, suggestion creation, approval, and dismissal is logged to Netlify Blobs with timestamps and user ID. |
-| **Encryption** | Connection strings encrypted at rest using AES‑256‑GCM (`ENCRYPTION_KEY`). Keys are never stored in the repo. |
-| **Rate limiting** | Per‑tenant request quota (configurable, default 500 req/min). Exceeded limits return `429`. |
-| **Data sent to AI** | Only query text, table/column metadata, and the `EXPLAIN ANALYZE` JSON. No literal values or personally identifiable information are transmitted. |
-| **Least‑privilege DB guidance** | Deploy a dedicated PostgreSQL role with `SELECT` on `pg_stat_statements` and permission to run `EXPLAIN`. No `INSERT/UPDATE/DELETE` rights. |
+### Query optimization lifecycle
 
----
+1. Connect PostgreSQL datasource.
+2. Scan and ingest slow query signals.
+3. Run EXPLAIN and AI analysis.
+4. Generate suggestions.
+5. Enforce policy decision: allow, block, or require approval.
+6. Track apply/dismiss actions.
+7. Run validation and compare before/after metrics.
+8. Review audit timeline.
 
-## 6. Data Model and Storage
-```
-User
- └─ Session
-Connection (encrypted credentials)
- └─ Tenant (multi‑tenant identifier)
-Query
- └─ Analysis (EXPLAIN JSON, AI summary, confidence)
-Suggestion
- └─ Approval (status, approver, timestamp)
-Policy (guardrails, rate limits)
-AuditLog (event, actor, timestamp)
-```
-* **Retention** – Audits are retained 90 days; suggestions are kept 180 days. Data older than the retention window is securely deleted.
-* **Privacy** – Plain query text is never persisted after analysis; only the anonymised plan is stored.
+### Authentication lifecycle
 
----
+1. Signup/login issues access + refresh tokens.
+2. Protected endpoints enforce auth and role checks.
+3. Refresh endpoint rotates token pair.
+4. Password reset and email verification support account recovery and verification.
 
-## 7. API Overview
-| Domain | Endpoint(s) | Auth Required |
-|--------|------------|--------------|
-| Auth | `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/password-reset` | No (credential) |
-| Connections | `GET /api/connections`, `POST /api/connections` | ✅ (role `engineer`/`admin`) |
-| Queries | `GET /api/queries`, `GET /api/queries/:id` | ✅ |
-| Analyses | `GET /api/analyses/:queryId` | ✅ |
-| Suggestions | `GET /api/suggestions`, `POST /api/suggestions/:id/approve`, `POST /api/suggestions/:id/dismiss` | ✅ (policy enforced) |
-| Policies | `GET /api/policies`, `PUT /api/policies/:id` | ✅ (admin) |
-| Audits | `GET /api/audits` | ✅ (admin) |
-| Admin | `GET /api/health`, `GET /api/metrics` | ✅ (admin) |
+## Security model
 
----
+- JWT-based authentication with role-aware middleware (`admin`, `editor`, `viewer` model in code).
+- Tenant-aware request context and tenant-aware schema constraints/indexes.
+- Session model includes tenant-safe FK (`sessions.user_id, sessions.tenant_id -> users.id, users.tenant_id`).
+- Audit events for key mutable workflows.
+- Rate limiting on auth-sensitive endpoints.
+- Encrypted connection secret handling through `ENCRYPTION_KEY`.
 
-## 8. Local Development
-**Prerequisites**
-1. Node 18+  
-2. Netlify CLI (`npm i -g netlify-cli`)  
-3. PostgreSQL 15+ with `pg_stat_statements` enabled.
+Operational boundary:
 
-**Installation**
+- QuerySage is advisory-first. Suggested SQL is not auto-executed on customer databases by backend automation.
+
+## API overview
+
+Main route groups:
+
+- Auth: `/api/auth/*`, `/api/auth/password/*`, `/api/auth/verify/*`
+- Connections: `/api/connections*`, `/api/connections/:id/test`
+- Queries: `/api/queries*`, `/api/queries/:id/explain`, `/api/queries/:id/analyze`
+- Suggestions and approvals: `/api/suggestions*`, `/api/approvals*`
+- Guardrails/policy: `/api/policies*`
+- Audit: `/api/audit/events`, `/api/audit/recommendations/:id/timeline`
+- Runs and validation: `/api/runs*`, `/api/validation`, `/api/validations`
+- Admin: `/api/admin/migrate`, `/api/admin/reset`
+
+## Environment configuration
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes for DB-backed auth/migrations | PostgreSQL connection for users/sessions/audit tables |
+| `POSTGRES_URL` | Optional fallback | Used by validation engine if `DATABASE_URL` is absent |
+| `JWT_SECRET` | Yes in production | JWT signing secret |
+| `ENCRYPTION_KEY` | Yes in production | Encryption key for stored connection secrets |
+| `GEMINI_API_KEY` | Yes for AI analysis | Gemini provider credential |
+| `RESEND_API_KEY` | Optional | Weekly digest email delivery |
+| `EMAIL_FROM` | Optional | Sender identity for transactional emails (defaults to `QuerySage <onboarding@resend.dev>`) |
+
+## Local development
+
+Install dependencies:
+
 ```bash
-git clone https://github.com/your-org/querysage.git
-cd querysage
 npm install
 ```
 
-**Environment variables** – placed in a `.env` at the project root:
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ENCRYPTION_KEY` | Recommended | (generated dev key) | AES‑256‑GCM key for Blob encryption |
-| `GEMINI_API_KEY` | **Required** | – | Google Gemini API credentials |
-| `RESEND_API_KEY` | Optional | – | Enables weekly digest emails |
-| `PORT` | Optional | `8888` | Netlify dev server port |
-| `RATE_LIMIT` | Optional | `500` | Requests per minute per tenant |
+Run frontend-only dev server:
 
-**Running locally**
 ```bash
-netlify dev   # starts functions, blobs emulation, and frontend on http://localhost:8888
+npm run dev
 ```
-**Caveats** – Netlify dev emulates Edge Functions but does not provide true edge latency; Blobs are stored in a local filesystem fallback.
 
----
+Build:
 
-## 9. Configuration (Environment Variables)
-See the table above. In production, set these variables in the Netlify UI under **Site settings → Build & deploy → Environment**.
+```bash
+npm run build
+```
 
----
+For full function/runtime parity (including Netlify Blobs behavior), use Netlify runtime locally:
 
-## 10. Deployment (Production)
-1. Push your repository to GitHub (or GitLab).
-2. Connect the repo to Netlify (Site → **Deploys → Link repository**).
-3. Add required environment variables (`ENCRYPTION_KEY`, `GEMINI_API_KEY`, optional `RESEND_API_KEY`).
-4. Netlify will run `vite build` (as defined in `netlify.toml`) and publish `dist/client`.
+```bash
+npx netlify dev
+```
 
-**Post‑deploy smoke checks**
-- `GET /api/health` returns `200 OK`.
-- Verify a test connection can be added via the UI.
-- Confirm a sample query yields a suggestion and that the suggestion appears in the audit log.
+## Production deployment guide
 
----
+1. Configure required environment variables in your hosting platform.
+2. Deploy using `vite build`.
+3. Run migrations through `/api/admin/migrate` with admin auth, or apply migration SQL directly.
+4. Execute smoke checks:
+   - login and refresh token flow
+   - protected endpoint authorization behavior
+   - query scan and analysis path
+   - audit event visibility
+5. Enable optional email features (`RESEND_API_KEY`) after core checks pass.
 
-## 11. Operations Runbook
-### Health Checks
-| Check | Expected | Method |
-|-------|----------|--------|
-| HTTP `/` | 200 + HTML | `curl -f https://<site>.netlify.app/` |
-| API health (`/api/health`) | `{status:"ok"}` | `curl https://<site>.netlify.app/api/health` |
-| Blob read/write | Success | Internal `/api/internal/ping` endpoint |
-| DB connectivity | `SELECT 1` succeeds | Netlify function log tail |
-| AI latency | < 500 ms | Monitor function logs |
+## GitHub OAuth setup guidance (planned integration)
 
-### Logs & Metrics
-- **Netlify Function Logs** – streamed to the Netlify UI; also aggregated to Logflare if configured.
-- **Prometheus endpoint** – `/api/metrics` exposes request counts, error rates, and latency histograms.
-- **Sentry** (optional) – captures uncaught exceptions.
+OAuth user-linking endpoints are not fully implemented yet. Production setup should follow:
 
-### Common Failure Modes & Recovery
-| Symptom | Likely cause | Recovery |
-|---------|--------------|----------|
-| No suggestions | `pg_stat_statements` disabled or empty | Enable extension, grant `pg_read_all_stats` to the service role |
-| 429 from Gemini | API quota exhausted | Request higher quota or enable exponential back‑off; temporarily disable digests |
-| Blob permission error | `ENCRYPTION_KEY` mismatch | Re‑set the key, run migration script `npm run migrations:rekey` |
-| Startup hangs | Missing `GEMINI_API_KEY` | Add key to `.env` or Netlify env vars, restart dev server |
+1. Register a GitHub OAuth app.
+2. Set callback URL to your production auth callback endpoint.
+3. Store client ID and secret in environment variables.
+4. Implement callback flow:
+   - exchange code for access token
+   - fetch user identity
+   - link/create QuerySage user
+   - issue QuerySage tokens and create session
+5. Add account link/unlink UX and audit events.
 
-### Incident Checklist
-1. Ping `/api/health` and `/api/internal/ping`.
-2. Review latest Netlify function logs for errors.
-3. Test DB connectivity with `psql` using the service role credentials.
-4. Check Gemini API status on Google Cloud console.
-5. Restart Netlify dev (`netlify dev --restart`) or trigger a fresh Netlify deploy.
+## Settings page user guide
 
----
+Current settings UX includes:
 
-## 12. Testing and Release Quality Gates
-**Automated testing**
-- Unit tests: `npm test` (≥ 90 % coverage). 
-- Integration tests: `npm run test:integration` against a Dockerized PostgreSQL with `pg_stat_statements`. 
-- End‑to‑end UI tests: `npm run cypress:run`.
+- Connection management (test, edit, delete).
+- Profile editing.
+- Password change form integration (`/api/auth/password/change`).
+- Security view from token claims.
+- OAuth connection toggle UI (MVP local-state behavior).
+- Admin danger-zone full data reset.
 
-**Security checks**
-- Lint & type‑check: `npm run lint`.
-- Dependency audit: `npm audit` (must have no high‑severity findings). 
-- Secrets scan: `git secrets --scan`.
+## Known limitations
 
-**Release checklist**
-1. All CI jobs pass. 
-2. Lint and audit clean. 
-3. Docs (README, API spec) updated. 
-4. Version bump following semver. 
-5. Deploy to a staging Netlify site and run smoke checks.
+- Some auth-adjacent flows still use in-memory token/code storage in MVP paths.
+- OAuth account linking and active-session revoke UI are pending.
+- Local E2E parity for some function paths depends on Netlify runtime configuration.
+- Password hashing is simplified in parts of the auth path and should be upgraded to full bcrypt workflow end-to-end.
 
----
+## Roadmap focus
 
-## 13. Known Limitations
-- **AI payload size** – Gemini limits request bodies to ~2 MiB; extremely large plans are truncated.
-- **Read‑only only** – System never applies DDL; customers must manually run generated statements.
-- **Single‑tenant dev mode** – Local dev uses a hard‑coded encryption key; multi‑tenant isolation is only enforced in production.
-- **PostgreSQL version** – Tested on 15.x; newer features from 16+ are not yet supported.
+Near-term priorities:
 
----
-
-## 14. Roadmap
-| Milestone | Target | Description |
-|-----------|--------|-------------|
-| v1.1 | Q3 2026 | RBAC integration with Netlify Identity; audit‑log UI improvements |
-| v1.2 | Q4 2026 | PostgreSQL 16 planner enhancements (incremental sort, partition pruning) |
-| v2.0 | Q2 2027 | Pluggable AI back‑ends (OpenAI, Anthropic) and configurable prompts |
-| v2.1 | Q3 2027 | Real‑time streaming of AI analysis via Server‑Sent Events |
-
----
-
-## 15. Contributing
-1. Fork the repository and create a feature branch (`git checkout -b feat/xyz`).
-2. Write tests for any new code.
-3. Run the full test matrix (`npm test && npm run test:integration && npm run cypress:run`).
-4. Lint (`npm run lint`) and ensure no new warnings.
-5. Open a PR with a clear description; reviewers will enforce the security and quality gates.
-
----
-
-## 16. License
-© 2024‑2026 QuerySage Contributors. Distributed under the **MIT License**. See `LICENSE` for full terms.
+1. Session management (view and revoke active sessions).
+2. GitHub OAuth integration end-to-end.
+3. Durable persistence for reset/verification token flows.
+4. End-to-end auth regression suite.
+5. Phase 6 operations: structured logs, metrics, alerting.

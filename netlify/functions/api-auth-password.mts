@@ -5,10 +5,10 @@
 
 import type { Context } from '@netlify/functions'
 import { json, errorResponse } from './lib/auth.js'
-import { getUserByEmail, getUserById } from './lib/db.js'
+import { getUserByEmail } from './lib/db.js'
 import { generateResetToken, validateResetToken, invalidateResetToken, sendPasswordResetEmail, validatePassword } from './lib/password-reset.js'
 import { appendAuditEvent } from './lib/audit.js'
-import { checkRateLimit, resetRateLimit, getRequestIdentifier, rateLimitErrorResponse, RATE_LIMIT_PRESETS } from './lib/rate-limit.js'
+import { checkRateLimit, getRequestIdentifier, rateLimitErrorResponse, RATE_LIMIT_PRESETS } from './lib/rate-limit.js'
 import crypto from 'crypto'
 
 export default async (req: Request, _ctx: Context) => {
@@ -59,11 +59,10 @@ export default async (req: Request, _ctx: Context) => {
 
       // Send reset email
       const baseUrl = new URL(req.url).origin
-      try {
-        await sendPasswordResetEmail(email, resetToken, baseUrl)
-      } catch (err) {
-        console.error('Failed to send password reset email:', err)
-        // Still return success - email failure shouldn't break the flow
+      const emailResult = await sendPasswordResetEmail(email, resetToken, baseUrl)
+      if (!emailResult.success) {
+        // Keep generic success response to prevent account enumeration.
+        console.error(`Failed to send password reset email for ${email}: ${emailResult.message}`)
       }
 
       // Audit: Password reset requested

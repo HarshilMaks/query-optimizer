@@ -4,6 +4,7 @@
  */
 
 import crypto from 'crypto'
+import { sendTransactionalEmail } from './email.js'
 
 const RESET_TOKEN_EXPIRY = 15 * 60 * 1000 // 15 minutes in milliseconds
 const RESET_TOKEN_LENGTH = 32
@@ -158,25 +159,23 @@ export async function sendPasswordResetEmail(
 ): Promise<{ success: boolean; message: string }> {
   const resetLink = `${baseUrl}/reset-password?token=${resetToken}`
   const emailTemplate = getPasswordResetEmailTemplate(email, resetLink)
+  const sendResult = await sendTransactionalEmail({
+    to: email,
+    subject: emailTemplate.subject,
+    html: emailTemplate.html,
+    text: emailTemplate.text,
+  })
 
-  // Mock: Log to console
-  console.log('📧 Password Reset Email')
-  console.log(`To: ${email}`)
-  console.log(`Subject: ${emailTemplate.subject}`)
-  console.log(`\nReset Link: ${resetLink}`)
-  console.log(`\n${emailTemplate.text}`)
-
-  // TODO: In production, integrate with actual email service:
-  // const response = await sendgrid.send({
-  //   to: email,
-  //   from: 'noreply@querysage.com',
-  //   subject: emailTemplate.subject,
-  //   html: emailTemplate.html,
-  // })
+  if (!sendResult.success) {
+    return {
+      success: false,
+      message: sendResult.error || 'Password reset email delivery failed',
+    }
+  }
 
   return {
     success: true,
-    message: `Password reset email sent to ${email} (check console in dev mode)`,
+    message: `Password reset email sent to ${email}`,
   }
 }
 

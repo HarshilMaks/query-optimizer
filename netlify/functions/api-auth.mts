@@ -82,7 +82,7 @@ export default async (req: Request, _ctx: Context) => {
 
         // Create session
         try {
-          await createSession(user.id, crypto.createHash('sha256').update(tokens.refreshToken).digest('hex'), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+          await createSession(user.id, user.tenant_id, crypto.createHash('sha256').update(tokens.refreshToken).digest('hex'), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
         } catch (err) {
           console.error('Failed to create session:', err)
           // Continue anyway - session tracking is optional
@@ -158,7 +158,7 @@ export default async (req: Request, _ctx: Context) => {
 
         // Create session
         try {
-          await createSession(user.id, crypto.createHash('sha256').update(tokens.refreshToken).digest('hex'), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+          await createSession(user.id, user.tenant_id, crypto.createHash('sha256').update(tokens.refreshToken).digest('hex'), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
         } catch (err) {
           console.error('Failed to create session:', err)
           // Continue anyway - session tracking is optional
@@ -239,7 +239,7 @@ export default async (req: Request, _ctx: Context) => {
         // Create new session with new refresh token
         try {
           const refreshTokenHash = crypto.createHash('sha256').update(newTokens.refreshToken).digest('hex')
-          await createSession(user.id, refreshTokenHash, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+          await createSession(user.id, user.tenant_id, refreshTokenHash, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
         } catch (err) {
           console.error('Failed to create new session:', err)
           // Continue anyway - session tracking is optional
