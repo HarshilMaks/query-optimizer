@@ -57,9 +57,10 @@ Thumbs.db
 # ==============================================================================
 # LOCAL DEVELOPMENT
 # ==============================================================================
-# Netlify CLI local state
+# Netlify CLI local state & dev server build outputs
 .netlify/cache/
 .netlify/blobs/
+.netlify/functions-serve/
 netlify-functions-local/
 
 # Vite dev server cache
